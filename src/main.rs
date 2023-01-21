@@ -1,6 +1,6 @@
 use anyhow::Result;
 use wasmer_wasi::WasiState;
-use wasmer::{Instance, Module, Store, Memory, AsStoreRef, MemoryView, FunctionEnvMut, WasmPtr, FunctionEnv, Function};
+use wasmer::{Instance, Module, Store, Memory, AsStoreRef, MemoryView, FunctionEnvMut, WasmPtr, FunctionEnv, Function, AsStoreMut};
 
 // Utils
 pub fn read_string(view: &MemoryView, start: u32, len: u32) -> Result<String> {
@@ -13,12 +13,16 @@ pub struct ExampleEnv {
 }
 
 impl ExampleEnv {
-    pub fn set_memory(&mut self, memory: Memory) {
+    fn set_memory(&mut self, memory: Memory) {
         self.memory = Some(memory);
     }
 
+    fn get_memory(&self) -> &Memory {
+        self.memory.as_ref().unwrap()
+    }
+    
     fn view<'a>(&'a self, store: &'a impl AsStoreRef) -> MemoryView<'a> {
-        self.memory.as_ref().unwrap().view(store)
+        self.get_memory().view(store)
     }
 }
 
@@ -30,6 +34,12 @@ fn http_get(ctx: FunctionEnvMut<ExampleEnv>, url: u32, url_len: u32) -> u32 {
     // Read url from memory
     let address = read_string(&view, url, url_len).unwrap();
     let response = ureq::get(&address).call().unwrap().into_string().unwrap();
+    
+    // If the response is too big, grow memory
+    let memory_size = view.data_size() as usize;
+    if 1024 + response.len() > memory_size {
+        env.get_memory().grow(&mut ctx, 1);
+    }
 
     // Write response as string [ptr, cap, len] to wasm memory and return pointer
     view.write(1024, &u32::to_le_bytes(1036)).unwrap();
