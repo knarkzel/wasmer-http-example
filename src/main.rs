@@ -1,6 +1,6 @@
 use anyhow::Result;
 use wasmer_wasi::WasiState;
-use wasmer::{Instance, Module, Store, Memory, AsStoreRef, MemoryView, FunctionEnvMut, WasmPtr, FunctionEnv, Function, AsStoreMut};
+use wasmer::{Instance, Module, Store, Memory, AsStoreRef, MemoryView, FunctionEnvMut, WasmPtr, FunctionEnv, Function};
 
 // Utils
 pub fn read_string(view: &MemoryView, start: u32, len: u32) -> Result<String> {
