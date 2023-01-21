@@ -51,9 +51,8 @@ fn http_get(ctx: FunctionEnvMut<ExampleEnv>, url: u32, url_len: u32) -> u32 {
 
 fn main() -> Result<()> {
     // Load module
-    let module_bytes = include_bytes!("../demo.wasm");
     let mut store = Store::default();
-    let module = Module::new(&store, &module_bytes)?;
+    let module = Module::new(&store, include_bytes!("../demo.wasm"))?;
 
     // Initialize wasi
     let wasi_env = WasiState::new("example").finalize(&mut store)?;
