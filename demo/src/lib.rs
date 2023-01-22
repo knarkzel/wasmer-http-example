@@ -14,6 +14,6 @@ fn get(url: &str) -> String {
 
 #[no_mangle]
 fn main() {
-    let response = get("https://dog.ceo/api/breeds/image/random");
-    println!("Response: {response}");
+    let response = get("https://postman-echo.com/bytes/5/mb?type=json");
+    println!("Response size: {}", response.len());
 }

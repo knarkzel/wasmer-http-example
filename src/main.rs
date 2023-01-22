@@ -26,27 +26,40 @@ impl ExampleEnv {
     }
 }
 
-fn http_get(ctx: FunctionEnvMut<ExampleEnv>, url: u32, url_len: u32) -> u32 {
+fn http_get(mut ctx: FunctionEnvMut<ExampleEnv>, url: u32, url_len: u32) -> u32 {
     // Setup environment
-    let env = ctx.data();
-    let view = env.view(&ctx);
+    let (response, memory_size) = {
+        // Read url from memory
+        let view = ctx.data().view(&ctx);
+        let memory_size = view.data_size() as usize;
+        let address = read_string(&view, url, url_len).unwrap();
 
-    // Read url from memory
-    let address = read_string(&view, url, url_len).unwrap();
-    let response = ureq::get(&address).call().unwrap().into_string().unwrap();
+        // Get request
+        let response = ureq::get(&address).call().unwrap();
+        let capacity = match response.header("Content-Length").map(|it| it.parse::<usize>()) {
+            Some(Ok(len)) => len,
+            _ => 1024,
+        };
+        let mut buffer = Vec::with_capacity(capacity);
+        let mut reader = response.into_reader();
+        reader.read_to_end(&mut buffer).unwrap();
+        (buffer, memory_size)
+    };
     
     // If the response is too big, grow memory
-    let memory_size = view.data_size() as usize;
-    if 1024 + response.len() > memory_size {
-        env.get_memory().grow(&mut ctx, 1);
+    if 1114112 + response.len() > memory_size {
+        let delta = (1114112 + response.len() - memory_size) / wasmer::WASM_PAGE_SIZE + 1;
+        let memory = ctx.data().get_memory().clone();
+        memory.grow(&mut ctx, delta as u32).unwrap();
     }
 
     // Write response as string [ptr, cap, len] to wasm memory and return pointer
-    view.write(1024, &u32::to_le_bytes(1036)).unwrap();
-    view.write(1028, &u32::to_le_bytes(response.len() as u32)).unwrap();
-    view.write(1032, &u32::to_le_bytes(response.len() as u32)).unwrap();
-    view.write(1036, response.as_bytes()).unwrap();
-    1024
+    let view = ctx.data().view(&ctx);
+    view.write(1114112, &u32::to_le_bytes(1114124)).unwrap();
+    view.write(1114116, &u32::to_le_bytes(response.len() as u32)).unwrap();
+    view.write(1114120, &u32::to_le_bytes(response.len() as u32)).unwrap();
+    view.write(1114124, &response).unwrap();
+    1114112
 }
 
 fn main() -> Result<()> {
